@@ -1,0 +1,161 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+
+<meta charset="UTF-8">
+
+<meta name="viewport"
+content="width=device-width, initial-scale=1.0">
+
+<title>
+PJ Archive Forensics
+</title>
+
+<link rel="preconnect"
+href="https://fonts.googleapis.com">
+
+<link rel="preconnect"
+href="https://fonts.gstatic.com"
+crossorigin>
+
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap"
+rel="stylesheet">
+
+<link rel="stylesheet"
+href="timeline.css">
+
+</head>
+
+<body>
+
+<nav class="navbar">
+
+<div class="logo-container">
+    <img
+        src="daifferent-logo.png"
+        alt="dAIfferent"
+        class="logo-image">
+</div>
+
+<ul class="nav-links">
+    <li><a href="index.html"</li>
+
+<li><a href="witnesses.html">Witness Statements</a></li>
+
+<li><a href="Timeline.html">Timelines</a></li>
+
+<li><a href="Maps.html">Maps</a></li>
+
+<li><a href="forensics.html">Forensic Reports</a></li>
+
+<li><a href="photograph.html">Photographs</a></li>
+
+<li><a href="Interview_Transcript.html">Interview Transcripts</a></li>
+
+<li><a href="Phone.html">Phone Records</a></li>
+
+<li><a href="police.html">Police Notes</a></li>
+
+<li><a href="Rogatory.html">Rogatory Interviews</a></li>
+
+<li><a href="correspondence.html">Correspondence</a></li>
+<li><a href="theories.html">Theories</a></li>
+</ul>
+
+</nav>
+<section class="hero">
+
+<div class="hero-content">
+
+<p class="tag">
+AI-ASSISTED CASE ARCHIVE
+</p>
+
+<h1>
+Madeleine McCann
+<span>Forensics</span>
+</h1>
+
+<p>
+Search forensic evidence,
+DNA findings,
+cadaver dog alerts,
+laboratory reports,
+and scientific analysis.
+</p>
+
+</div>
+
+</section>
+
+<section class="timeline-search-section">
+
+<div class="timeline-search-box">
+
+<h2>
+Forensics AI Search
+</h2>
+
+<p>
+Ask anything about forensic evidence.
+</p>
+
+<div class="timeline-search-area">
+
+<input
+type="text"
+id="forensicsSearch"
+placeholder="Ask something about forensic evidence...">
+
+<button onclick="forensicsSearch()">
+AI Search
+</button>
+
+</div>
+
+<div id="aiAnswer"></div>
+
+<div class="questions">
+
+<div class="question-card"
+onclick="quickForensics('Explain the cadaver dog alerts.')">
+Explain the cadaver dog alerts.
+</div>
+
+<div class="question-card"
+onclick="quickForensics('What DNA evidence was found?')">
+What DNA evidence was found?
+</div>
+
+<div class="question-card"
+onclick="quickForensics('What were the forensic limitations?')">
+What were the forensic limitations?
+</div>
+
+<div class="question-card"
+onclick="quickForensics('What laboratory results were reported?')">
+What laboratory results were reported?
+</div>
+
+<div class="question-card"
+onclick="quickForensics('What evidence was collected from Apartment 5A?')">
+What evidence was collected from Apartment 5A?
+</div>
+
+<div class="question-card"
+onclick="quickForensics('Summarize all forensic findings.')">
+Summarize all forensic findings.
+</div>
+
+</div>
+
+</div>
+
+</section>
+
+<script src="forensics.js"></script>
+
+</body>
+</html>
+

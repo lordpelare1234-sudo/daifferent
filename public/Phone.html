@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+
+<meta charset="UTF-8">
+
+<meta name="viewport"
+content="width=device-width, initial-scale=1.0">
+
+<title>
+PJ Archive Phone Records
+</title>
+
+<link rel="preconnect"
+href="https://fonts.googleapis.com">
+
+<link rel="preconnect"
+href="https://fonts.gstatic.com"
+crossorigin>
+
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap"
+rel="stylesheet">
+
+<link rel="stylesheet"
+href="timeline.css">
+
+</head>
+
+<nav class="navbar">
+
+<div class="logo-container">
+    <img
+        src="daifferent-logo.png"
+        alt="dAIfferent"
+        class="logo-image">
+</div>
+
+<ul class="nav-links">
+<li><a href="index.html">Home</a></li>
+<li><a href="witnesses.html">Witness Statements</a></li>
+
+<li><a href="Timeline.html">Timelines</a></li>
+
+<li><a href="Maps.html">Maps</a></li>
+
+<li><a href="forensics.html">Forensic Reports</a></li>
+
+<li><a href="photograph.html">Photographs</a></li>
+
+<li><a href="Interview_Transcript.html">Interview Transcripts</a></li>
+
+<li><a href="Phone.html">Phone Records</a></li>
+
+<li><a href="police.html">Police Notes</a></li>
+
+<li><a href="Rogatory.html">Rogatory Interviews</a></li>
+
+<li><a href="correspondence.html">Correspondence</a></li>
+
+<li><a href="theories.html">Theories</a></li>
+
+</ul>
+
+</nav>
+
+
+<section class="hero">
+
+<div class="hero-content">
+
+<p class="tag">
+AI-ASSISTED CASE ARCHIVE
+</p>
+
+<h1>
+Madeleine McCann
+<span>Phone Records</span>
+</h1>
+
+<p>
+Search call records,
+communications,
+mobile phone activity,
+contact analysis,
+and communications timelines.
+</p>
+
+</div>
+
+</section>
+
+<section class="timeline-search-section">
+
+<div class="timeline-search-box">
+
+<h2>
+Phone Records AI Search
+</h2>
+
+<p>
+Ask anything about phone records.
+</p>
+
+<div class="timeline-search-area">
+
+<input
+type="text"
+id="phoneSearch"
+placeholder="Ask something about phone records...">
+
+<button onclick="phoneSearch()">
+AI Search
+</button>
+
+</div>
+
+<div id="aiAnswer"></div>
+
+<div class="questions">
+
+<div class="question-card"
+onclick="quickPhone('Who made calls on May 3, 2007?')">
+Who made calls on May 3, 2007?
+</div>
+
+<div class="question-card"
+onclick="quickPhone('Analyze communication patterns.')">
+Analyze communication patterns.
+</div>
+
+<div class="question-card"
+onclick="quickPhone('What phone records are significant?')">
+What phone records are significant?
+</div>
+
+<div class="question-card"
+onclick="quickPhone('Were there unusual communication gaps?')">
+Were there unusual communication gaps?
+</div>
+
+<div class="question-card"
+onclick="quickPhone('How do phone records compare to witness statements?')">
+How do phone records compare to witness statements?
+</div>
+
+<div class="question-card"
+onclick="quickPhone('Summarize all phone evidence.')">
+Summarize all phone evidence.
+</div>
+
+</div>
+
+</div>
+
+</section>
+
+<script src="phone.js"></script>
+
+</body>
+</html>

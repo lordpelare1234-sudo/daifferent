@@ -1,0 +1,293 @@
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+<meta charset="UTF-8">
+
+<meta name="viewport"
+content="width=device-width, initial-scale=1.0">
+
+<title>
+PJ Archive - Create Account
+</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap"
+rel="stylesheet">
+
+<style>
+
+*{
+margin:0;
+padding:0;
+box-sizing:border-box;
+font-family:Poppins,sans-serif;
+}
+
+body{
+
+height:100vh;
+
+display:flex;
+
+justify-content:center;
+
+align-items:center;
+
+background:
+linear-gradient(
+135deg,
+#0f172a,
+#1e293b
+);
+
+}
+
+.card{
+
+background:white;
+
+padding:40px;
+
+width:420px;
+
+border-radius:20px;
+
+box-shadow:
+0 20px 50px rgba(0,0,0,.25);
+
+}
+
+h1{
+
+margin-bottom:10px;
+
+}
+
+p{
+
+color:#666;
+
+margin-bottom:25px;
+
+}
+
+input{
+
+width:100%;
+
+padding:14px;
+
+margin-bottom:15px;
+
+border:1px solid #ddd;
+
+border-radius:10px;
+
+font-size:15px;
+
+}
+
+button{
+
+width:100%;
+
+padding:14px;
+
+border:none;
+
+border-radius:10px;
+
+background:#2563eb;
+
+color:white;
+
+font-size:16px;
+
+font-weight:600;
+
+cursor:pointer;
+
+}
+
+button:hover{
+
+background:#1d4ed8;
+
+}
+
+#message{
+
+margin-top:15px;
+
+text-align:center;
+
+font-weight:600;
+
+}
+
+.back{
+
+display:block;
+
+text-align:center;
+
+margin-top:20px;
+
+text-decoration:none;
+
+color:#2563eb;
+
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="card">
+
+<h1>
+
+Create Account
+
+</h1>
+
+<p>
+
+Create your PJ Archive account
+
+</p>
+
+<input
+type="email"
+id="email"
+placeholder="Email">
+
+<input
+type="password"
+id="password"
+placeholder="Password">
+
+<button
+onclick="signup()">
+
+Create Account
+
+</button>
+
+<div id="message"></div>
+
+<a
+href="login-user.html"
+class="back">
+
+Already have an account?
+
+</a>
+
+</div>
+
+<script>
+
+async function signup(){
+
+  const email =
+
+  document
+  .getElementById("email")
+  .value;
+
+  const password =
+
+  document
+  .getElementById("password")
+  .value;
+
+  if(!email || !password){
+
+    document
+    .getElementById("message")
+    .innerText =
+
+    "Please fill all fields";
+
+    return;
+
+  }
+
+  try{
+
+    const response =
+
+    await fetch(
+
+      "/signup",
+
+      {
+
+        method:"POST",
+
+        headers:{
+
+          "Content-Type":
+          "application/json"
+
+        },
+
+        body:JSON.stringify({
+
+          email,
+          password
+
+        })
+
+      }
+
+    );
+
+    const data =
+
+    await response.json();
+
+    document
+    .getElementById("message")
+    .innerText =
+
+    data.message;
+
+    if(data.success){
+
+      setTimeout(()=>{
+
+        window.location.href =
+
+        "/login-user.html";
+
+      },1500);
+
+    }
+
+  }
+
+  catch(error){
+
+    console.log(error);
+
+    document
+    .getElementById("message")
+    .innerText =
+
+    "Server error";
+
+  }
+
+}
+
+</script>
+
+</body>
+
+</html>

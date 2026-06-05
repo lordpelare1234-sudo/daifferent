@@ -1,0 +1,374 @@
+
+<!DOCTYPE html>
+<html>
+
+<head>
+
+<meta charset="UTF-8">
+
+<title>
+Document Management
+</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap"
+rel="stylesheet">
+
+<style>
+
+*{
+margin:0;
+padding:0;
+box-sizing:border-box;
+font-family:Poppins,sans-serif;
+}
+
+body{
+
+background:
+linear-gradient(
+135deg,
+#020617,
+#0f172a,
+#1e293b
+);
+
+padding:40px;
+
+color:white;
+
+}
+
+.header{
+
+display:flex;
+
+justify-content:space-between;
+
+align-items:center;
+
+margin-bottom:25px;
+
+}
+
+.back-btn{
+
+background:
+rgba(255,255,255,.08);
+
+padding:12px 18px;
+
+border-radius:12px;
+
+text-decoration:none;
+
+color:white;
+
+}
+
+.search{
+
+width:100%;
+
+padding:15px;
+
+border:none;
+
+border-radius:12px;
+
+margin-bottom:25px;
+
+background:
+rgba(255,255,255,.08);
+
+color:white;
+
+}
+
+.grid{
+
+display:grid;
+
+grid-template-columns:
+repeat(auto-fill,minmax(320px,1fr));
+
+gap:20px;
+
+}
+
+.card{
+
+background:
+rgba(255,255,255,.06);
+
+padding:20px;
+
+border-radius:20px;
+
+border:
+1px solid rgba(255,255,255,.08);
+
+}
+
+.card h3{
+
+word-break:break-word;
+
+margin-bottom:10px;
+
+}
+
+.actions{
+
+display:flex;
+
+gap:10px;
+
+margin-top:15px;
+
+}
+
+.btn{
+
+border:none;
+
+padding:10px 15px;
+
+border-radius:10px;
+
+cursor:pointer;
+
+font-weight:600;
+
+}
+
+.open{
+
+background:#2563eb;
+color:white;
+
+}
+
+.delete{
+
+background:#ef4444;
+color:white;
+
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="header">
+
+<h1>
+
+Document Management
+
+</h1>
+
+<a
+href="dashboard.html"
+class="back-btn">
+
+Back
+
+</a>
+
+</div>
+
+<input
+type="text"
+id="search"
+class="search"
+placeholder="Search documents..."
+onkeyup="filterFiles()">
+
+<div id="files"
+class="grid">
+
+Loading...
+
+</div>
+
+<script>
+
+let allFiles = [];
+
+async function loadFiles(){
+
+const response =
+await fetch("/files");
+
+const data =
+await response.json();
+
+allFiles =
+data.files || [];
+
+renderFiles(allFiles);
+
+}
+
+function renderFiles(files){
+
+const container =
+
+document.getElementById(
+"files"
+);
+
+container.innerHTML = "";
+
+files.forEach(file=>{
+
+container.innerHTML += `
+
+<div class="card">
+
+<h3>
+
+${file.name}
+
+</h3>
+
+<div class="actions">
+
+<button
+class="btn open"
+onclick="openFile('${file.name}')">
+
+Open
+
+</button>
+
+<button
+class="btn delete"
+onclick="deleteFile('${file.name}')">
+
+Delete
+
+</button>
+
+</div>
+
+</div>
+
+`;
+
+});
+
+}
+
+async function openFile(fileName){
+
+const response =
+
+await fetch(
+
+"/file-url/" +
+
+encodeURIComponent(
+fileName
+)
+
+);
+
+const data =
+await response.json();
+
+if(data.success){
+
+window.open(
+data.url,
+"_blank"
+);
+
+}
+
+}
+
+async function deleteFile(fileName){
+
+const confirmed =
+
+confirm(
+
+"Delete " +
+
+fileName +
+
+" ?"
+
+);
+
+if(!confirmed){
+
+return;
+
+}
+
+const response =
+
+await fetch(
+
+"/delete-file/" +
+
+encodeURIComponent(
+fileName
+),
+
+{
+
+method:"DELETE"
+
+}
+
+);
+
+const data =
+await response.json();
+
+if(data.success){
+
+loadFiles();
+
+}
+
+}
+
+function filterFiles(){
+
+const search =
+
+document
+.getElementById(
+"search"
+)
+.value
+.toLowerCase();
+
+const filtered =
+
+allFiles.filter(file=>
+
+file.name
+.toLowerCase()
+.includes(search)
+
+);
+
+renderFiles(filtered);
+
+}
+
+loadFiles();
+
+</script>
+
+</body>
+
+</html>
+

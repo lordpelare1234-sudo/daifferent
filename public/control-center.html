@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+<meta charset="UTF-8">
+
+<meta name="viewport"
+content="width=device-width, initial-scale=1.0">
+
+<title>Archive Control Center</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap"
+rel="stylesheet">
+
+<style>
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: Poppins, sans-serif;
+}
+
+body {
+  background: linear-gradient(135deg, #020617, #0f172a, #1e293b);
+  padding: 40px;
+  min-height: 100vh;
+  color: white;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+}
+
+.back-btn {
+  text-decoration: none;
+  color: white;
+  padding: 12px 18px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, .08);
+  transition: .3s;
+}
+
+.back-btn:hover {
+  background: rgba(255, 255, 255, .15);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+}
+
+.card {
+  background: rgba(255, 255, 255, .06);
+  border: 1px solid rgba(255, 255, 255, .08);
+  backdrop-filter: blur(20px);
+  padding: 25px;
+  border-radius: 20px;
+  transition: .3s;
+}
+
+.card:hover {
+  transform: translateY(-5px);
+  border-color: rgba(255, 255, 255, .2);
+}
+
+.card h3 {
+  margin-bottom: 10px;
+  font-size: 0.95rem;
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.card p {
+  color: #f1f5f9;
+  font-size: 1.1rem;
+  font-weight: 600;
+  word-break: break-all;
+}
+
+a.card-link {
+  text-decoration: none;
+  color: inherit;
+  display: block;
+}
+
+a.card-link .card {
+  cursor: pointer;
+  border-color: rgba(99, 179, 237, .25);
+}
+
+a.card-link .card:hover {
+  border-color: rgba(99, 179, 237, .6);
+  background: rgba(99, 179, 237, .08);
+  transform: translateY(-5px);
+}
+
+a.card-link .card h3 {
+  color: #63b3ed;
+}
+
+a.card-link .card p {
+  color: white;
+}
+
+.status-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #22c55e;
+  margin-right: 8px;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="header">
+  <h1>Archive Control Center</h1>
+  <a href="dashboard.html" class="back-btn">← Back</a>
+</div>
+
+<div class="grid">
+
+  <!-- Clickable Total Documents -->
+  <a href="archive-files.html" class="card-link">
+    <div class="card">
+      <h3>Total Documents</h3>
+      <p id="totalDocs">Loading...</p>
+    </div>
+  </a>
+
+  <div class="card">
+    <h3>Storage Status</h3>
+    <p><span class="status-dot"></span>Supabase Connected</p>
+  </div>
+
+  <div class="card">
+    <h3>AI Status</h3>
+    <p><span class="status-dot"></span>Online</p>
+  </div>
+
+  <div class="card">
+    <h3>Archive Health</h3>
+    <p><span class="status-dot"></span>Operational</p>
+  </div>
+
+  <div class="card">
+    <h3>Last Upload</h3>
+    <p id="lastUpload">Loading...</p>
+  </div>
+
+  <div class="card">
+    <h3>Backup Archive</h3>
+    <p style="color:#64748b;">Coming Soon</p>
+  </div>
+
+  <div class="card">
+    <h3>Recent Activity</h3>
+    <p id="recentActivity">Loading...</p>
+  </div>
+
+  <div class="card">
+    <h3>Storage Used</h3>
+    <p id="storageUsed">Loading...</p>
+  </div>
+
+</div><!-- ✅ grid ends here — all 8 cards inside -->
+
+<script>
+
+async function loadStats() {
+  try {
+
+    const response = await fetch("/files");
+    const data = await response.json();
+
+    if (!data.success) {
+      document.getElementById("totalDocs").innerText = "Error";
+      document.getElementById("lastUpload").innerText = "Error";
+      document.getElementById("storageUsed").innerText = "Error";
+      document.getElementById("recentActivity").innerText = "Error";
+      return;
+    }
+
+    const files = data.files || [];
+
+    // Total docs
+    document.getElementById("totalDocs").innerText = files.length;
+
+    // Last upload
+    if (files.length > 0) {
+      document.getElementById("lastUpload").innerText = files[files.length - 1].name;
+    } else {
+      document.getElementById("lastUpload").innerText = "No files yet";
+    }
+
+    // Storage used — sum metadata.size
+    let totalBytes = 0;
+    files.forEach(file => {
+      if (file.metadata && file.metadata.size) {
+        totalBytes += file.metadata.size;
+      }
+    });
+
+    // Format nicely: bytes → KB → MB → GB
+    let storageLabel;
+    if (totalBytes < 1024) {
+      storageLabel = totalBytes + " B";
+    } else if (totalBytes < 1024 * 1024) {
+      storageLabel = (totalBytes / 1024).toFixed(2) + " KB";
+    } else if (totalBytes < 1024 * 1024 * 1024) {
+      storageLabel = (totalBytes / 1024 / 1024).toFixed(2) + " MB";
+    } else {
+      storageLabel = (totalBytes / 1024 / 1024 / 1024).toFixed(2) + " GB";
+    }
+
+    document.getElementById("storageUsed").innerText = storageLabel;
+
+    // Recent activity
+    if (files.length > 0) {
+      document.getElementById("recentActivity").innerText =
+        "Latest: " + files[files.length - 1].name;
+    } else {
+      document.getElementById("recentActivity").innerText = "No recent activity";
+    }
+
+  } catch (error) {
+    console.error("loadStats error:", error);
+    document.getElementById("totalDocs").innerText = "Error";
+    document.getElementById("storageUsed").innerText = "Error";
+  }
+}
+
+loadStats();
+
+</script>
+
+</body>
+</html>
