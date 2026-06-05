@@ -24,16 +24,12 @@ createClient(
 );
 
 
-  // ====================
-  // APP INIT
-  // ====================
+  
 
   const app = express();
 
 
-  // ====================
-  // MIDDLEWARE (order is critical)
-  // ====================
+  
 
   app.use(express.json());
   app.use(express.static("public"));
@@ -1129,8 +1125,9 @@ files:data
 
 });
 
-
-
+app.get("/", (req, res) => {
+  res.sendFile(__dirname + "/public/login.html");
+});
   // START SERVER
   // ====================
 
