@@ -5,12 +5,14 @@ let driveCache = null;
 let cacheTime = null;
 const CACHE_DURATION = 1000 * 60 * 15;
 
+
 async function getDriveClient() {
 
   const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
   const rawKey = process.env.GOOGLE_PRIVATE_KEY;
 
   console.log("[Drive] Email:", email);
+  console.log("[Drive] Email Length:", email?.length);
   console.log("[Drive] Key Exists:", !!rawKey);
 
   if (!email || !rawKey) {
@@ -21,6 +23,11 @@ async function getDriveClient() {
 
   const privateKey = rawKey.replace(/\\n/g, "\n");
 
+  console.log(
+    "[Drive] Key Preview:",
+    privateKey.substring(0, 40)
+  );
+
   const auth = new google.auth.JWT(
     email,
     null,
@@ -30,7 +37,6 @@ async function getDriveClient() {
     ]
   );
 
-  // TEST AUTHORIZATION
   await auth.authorize();
 
   console.log("[Drive] JWT Authorized");
@@ -40,6 +46,8 @@ async function getDriveClient() {
     auth
   });
 }
+
+
 
 
 async function fetchAllDriveDocuments() {
