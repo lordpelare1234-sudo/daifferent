@@ -1,128 +1,84 @@
-
 async function rogatorySearch() {
 
-  const question =
-  document.getElementById(
-    "rogatorySearch"
-  ).value;
+  const input = document.getElementById("rogatorySearch");
+  const question = input.value.trim();
 
-  const aiAnswer =
-  document.getElementById(
-    "aiAnswer"
-  );
+  if (!question) return;
 
-  aiAnswer.innerHTML = `
+  // Get or create chat container
+  let chatContainer = document.getElementById("chatContainer");
+  if (!chatContainer) {
+    const aiAnswer = document.getElementById("aiAnswer");
+    aiAnswer.innerHTML = `<div id="chatContainer" class="chat-container"></div>`;
+    chatContainer = document.getElementById("chatContainer");
+  }
 
-    <div class="timeline-event">
-
-      <h2>
-        Rogatory AI
-      </h2>
-
-      <p>
-        Analyzing rogatory interviews...
-      </p>
-
+  // Add user message
+  chatContainer.innerHTML += `
+    <div class="user-message">
+      ${question}
     </div>
-
   `;
+
+  input.value = "";
+  chatContainer.scrollTop = chatContainer.scrollHeight;
+
+  // Loading bubble
+  const loadingId = "loading-" + Date.now();
+  chatContainer.innerHTML += `
+    <div class="ai-message" id="${loadingId}">
+      <span style="color:#666;">Searching rogatory interviews...</span>
+    </div>
+  `;
+  chatContainer.scrollTop = chatContainer.scrollHeight;
 
   try {
 
-    const response =
-    await fetch(
+    const response = await fetch("/rogatory-search", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question })
+    });
 
-      "/rogatory-search",
+    const data = await response.json();
 
-      {
+    const loadingEl = document.getElementById(loadingId);
+    if (loadingEl) loadingEl.remove();
 
-        method: "POST",
-
-        headers: {
-
-          "Content-Type":
-          "application/json"
-
-        },
-
-        body: JSON.stringify({
-
-          question
-
-        })
-
-      }
-
-    );
-
-    const data =
-    await response.json();
-
-    aiAnswer.innerHTML = `
-
-      <div class="timeline-event">
-
-        <h2>
-          Rogatory Analysis
-        </h2>
-
-        <p>
-          ${data.answer}
-        </p>
-
+    chatContainer.innerHTML += `
+      <div class="ai-message">
+        <strong>Rogatory AI</strong>
+        <br><br>
+        ${marked.parse(data.answer || "No response received.")}
       </div>
-
     `;
+
+    chatContainer.scrollTop = chatContainer.scrollHeight;
 
   } catch (error) {
 
-    aiAnswer.innerHTML = `
+    const loadingEl = document.getElementById(loadingId);
+    if (loadingEl) loadingEl.remove();
 
-      <div class="timeline-event">
-
-        <h2>
-          Error
-        </h2>
-
-        <p>
-          Rogatory AI failed.
-        </p>
-
+    chatContainer.innerHTML += `
+      <div class="ai-message">
+        Rogatory AI failed. Please try again.
       </div>
-
     `;
 
     console.error(error);
-
   }
 
 }
 
 function quickRogatory(question) {
-
-  document.getElementById(
-    "rogatorySearch"
-  ).value =
-  question;
-
+  document.getElementById("rogatorySearch").value = question;
   rogatorySearch();
-
 }
 
-document
-.querySelectorAll(".question-card")
-.forEach(card => {
-
-  card.addEventListener(
-    "click",
-    () => {
-
-      quickRogatory(
-        card.innerText.trim()
-      );
-
+document.getElementById("rogatorySearch")
+  .addEventListener("keypress", function (event) {
+    if (event.key === "Enter") {
+      rogatorySearch();
     }
-  );
-
-});
-
+  });

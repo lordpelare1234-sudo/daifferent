@@ -1,29 +1,18 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
 
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PJ Archive Theories</title>
 
-<meta name="viewport"
-content="width=device-width, initial-scale=1.0">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
-<title>
-PJ Archive Theories
-</title>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 
-<link rel="preconnect"
-href="https://fonts.googleapis.com">
-
-<link rel="preconnect"
-href="https://fonts.gstatic.com"
-crossorigin>
-
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap"
-rel="stylesheet">
-
-<link rel="stylesheet"
-href="timeline.css">
+<link rel="stylesheet" href="timeline.css">
 
 </head>
 
@@ -32,47 +21,30 @@ href="timeline.css">
 <nav class="navbar">
 
 <div class="logo-container">
-    <img
-        src="daifferent-logo.png"
-        alt="dAIfferent"
-        class="logo-image">
+  <img src="daifferent-logo.png" alt="dAIfferent" class="logo-image">
 </div>
 
 <ul class="nav-links">
 <li><a href="Home.html">Home</a></li>
 <li><a href="witnesses.html">Witness Statements</a></li>
-
 <li><a href="Timeline.html">Timelines</a></li>
-
 <li><a href="Maps.html">Maps</a></li>
-
 <li><a href="forensics.html">Forensic Reports</a></li>
-
 <li><a href="photograph.html">Photographs</a></li>
-
 <li><a href="Interview_Transcript.html">Interview Transcripts</a></li>
-
 <li><a href="Phone.html">Phone Records</a></li>
-
 <li><a href="police.html">Police Notes</a></li>
-
 <li><a href="Rogatory.html">Rogatory Interviews</a></li>
-
 <li><a href="correspondence.html">Correspondence</a></li>
-
 <li><a href="theories.html">Theories</a></li>
-
 </ul>
 
 </nav>
 
 <section class="hero">
-
 <div class="hero-content">
 
-<p class="tag">
-AI-ASSISTED CASE ARCHIVE
-</p>
+<p class="tag">AI-ASSISTED CASE ARCHIVE</p>
 
 <h1>
 Madeleine McCann
@@ -88,62 +60,48 @@ and unresolved questions.
 </p>
 
 </div>
-
 </section>
 
 <section class="timeline-search-section">
-
 <div class="timeline-search-box">
 
-<h2>
-Theories AI Search
-</h2>
-
-<p>
-Ask anything about theories and competing explanations.
-</p>
+<h2>Theories AI Search</h2>
+<p>Ask anything about theories and competing explanations.</p>
 
 <div class="timeline-search-area">
-
 <input
-type="text"
-id="theoriesSearch"
-placeholder="Ask something about theories...">
-
-<button onclick="theoriesSearch()">
-AI Search
-</button>
-
+  type="text"
+  id="theoriesSearch"
+  placeholder="Ask something about theories...">
+<button onclick="theoriesSearch()">AI Search</button>
 </div>
 
 <div id="aiAnswer"></div>
 
 <div class="questions">
 
-<div class="question-card">
+<div class="question-card" onclick="quickTheory('What supports the abduction theory?')">
 What supports the abduction theory?
 </div>
 
-<div class="question-card">
+<div class="question-card" onclick="quickTheory('What evidence challenges the abduction theory?')">
 What evidence challenges the abduction theory?
 </div>
 
-<div class="question-card">
+<div class="question-card" onclick="quickTheory('Which theory best fits the evidence?')">
 Which theory best fits the evidence?
 </div>
 
-<div class="question-card">
+<div class="question-card" onclick="quickTheory('What are the unresolved questions?')">
 What are the unresolved questions?
 </div>
 
 </div>
 
 </div>
-
 </section>
 
 <script src="theories.js"></script>
 
 </body>
 </html>
-

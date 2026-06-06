@@ -1,128 +1,81 @@
-
 async function forensicsSearch() {
 
-  const question =
-  document.getElementById(
-    "forensicsSearch"
-  ).value;
+  const input = document.getElementById("forensicsSearch");
+  const question = input.value.trim();
 
-  const aiAnswer =
-  document.getElementById(
-    "aiAnswer"
-  );
+  if (!question) return;
 
-  aiAnswer.innerHTML = `
+  let chatContainer = document.getElementById("chatContainer");
+  if (!chatContainer) {
+    const aiAnswer = document.getElementById("aiAnswer");
+    aiAnswer.innerHTML = `<div id="chatContainer" class="chat-container"></div>`;
+    chatContainer = document.getElementById("chatContainer");
+  }
 
-    <div class="timeline-event">
-
-      <h2>
-        Forensics AI
-      </h2>
-
-      <p>
-        Analyzing forensic evidence...
-      </p>
-
+  chatContainer.innerHTML += `
+    <div class="user-message">
+      ${question}
     </div>
-
   `;
+
+  input.value = "";
+  chatContainer.scrollTop = chatContainer.scrollHeight;
+
+  const loadingId = "loading-" + Date.now();
+  chatContainer.innerHTML += `
+    <div class="ai-message" id="${loadingId}">
+      <span style="color:#666;">Analyzing forensic evidence...</span>
+    </div>
+  `;
+  chatContainer.scrollTop = chatContainer.scrollHeight;
 
   try {
 
-    const response =
-    await fetch(
+    const response = await fetch("/forensics-search", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question })
+    });
 
-      "/forensics-search",
+    const data = await response.json();
 
-      {
+    const loadingEl = document.getElementById(loadingId);
+    if (loadingEl) loadingEl.remove();
 
-        method: "POST",
-
-        headers: {
-
-          "Content-Type":
-          "application/json"
-
-        },
-
-        body: JSON.stringify({
-
-          question
-
-        })
-
-      }
-
-    );
-
-    const data =
-    await response.json();
-
-    aiAnswer.innerHTML = `
-
-      <div class="timeline-event">
-
-        <h2>
-          Forensics Analysis
-        </h2>
-
-        <p>
-          ${data.answer}
-        </p>
-
+    chatContainer.innerHTML += `
+      <div class="ai-message">
+        <strong>Forensics AI</strong>
+        <br><br>
+        ${marked.parse(data.answer || "No response received.")}
       </div>
-
     `;
+
+    chatContainer.scrollTop = chatContainer.scrollHeight;
 
   } catch (error) {
 
-    aiAnswer.innerHTML = `
+    const loadingEl = document.getElementById(loadingId);
+    if (loadingEl) loadingEl.remove();
 
-      <div class="timeline-event">
-
-        <h2>
-          Error
-        </h2>
-
-        <p>
-          Forensics AI failed.
-        </p>
-
+    chatContainer.innerHTML += `
+      <div class="ai-message">
+        Forensics AI failed. Please try again.
       </div>
-
     `;
 
     console.error(error);
-
   }
 
 }
 
 function quickForensics(question) {
-
-  document.getElementById(
-    "forensicsSearch"
-  ).value =
-  question;
-
+  document.getElementById("forensicsSearch").value = question;
   forensicsSearch();
-
 }
 
-document
-.querySelectorAll(".question-card")
-.forEach(card => {
-
-  card.addEventListener(
-    "click",
-    () => {
-
-      quickForensics(
-        card.innerText.trim()
-      );
-
+document.getElementById("forensicsSearch")
+  .addEventListener("keypress", function (event) {
+    if (event.key === "Enter") {
+      forensicsSearch();
     }
-  );
-
-});
-
+  });

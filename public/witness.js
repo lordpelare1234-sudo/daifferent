@@ -1,128 +1,86 @@
-
 async function witnessSearch() {
 
-  const question =
-  document.getElementById(
-    "witnessSearch"
-  ).value;
+  const input = document.getElementById("witnessSearch");
+  const question = input.value.trim();
 
-  const aiAnswer =
-  document.getElementById(
-    "aiAnswer"
-  );
+  if (!question) return;
 
-  aiAnswer.innerHTML = `
+  // Get or create chat container
+  let chatContainer = document.getElementById("chatContainer");
+  if (!chatContainer) {
+    const aiAnswer = document.getElementById("aiAnswer");
+    aiAnswer.innerHTML = `<div id="chatContainer" class="chat-container"></div>`;
+    chatContainer = document.getElementById("chatContainer");
+  }
 
-    <div class="timeline-event">
-
-      <h2>
-        Witness AI
-      </h2>
-
-      <p>
-        Analyzing witness statements...
-      </p>
-
+  // Add user message
+  chatContainer.innerHTML += `
+    <div class="user-message">
+      ${question}
     </div>
-
   `;
+
+  input.value = "";
+  chatContainer.scrollTop = chatContainer.scrollHeight;
+
+  // Loading bubble
+  const loadingId = "loading-" + Date.now();
+  chatContainer.innerHTML += `
+    <div class="ai-message" id="${loadingId}">
+      <span style="color:#666;">Searching witness statements...</span>
+    </div>
+  `;
+  chatContainer.scrollTop = chatContainer.scrollHeight;
 
   try {
 
-    const response =
-    await fetch(
+    const response = await fetch("/witness-search", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question })
+    });
 
-      "/witness-search",
+    const data = await response.json();
 
-      {
+    // Remove loading bubble
+    const loadingEl = document.getElementById(loadingId);
+    if (loadingEl) loadingEl.remove();
 
-        method: "POST",
-
-        headers: {
-
-          "Content-Type":
-          "application/json"
-
-        },
-
-        body: JSON.stringify({
-
-          question
-
-        })
-
-      }
-
-    );
-
-    const data =
-    await response.json();
-
-    aiAnswer.innerHTML = `
-
-      <div class="timeline-event">
-
-        <h2>
-          Witness Analysis
-        </h2>
-
-        <p>
-          ${data.answer}
-        </p>
-
+    // Add AI response
+    chatContainer.innerHTML += `
+      <div class="ai-message">
+        <strong>Witness AI</strong>
+        <br><br>
+        ${marked.parse(data.answer || "No response received.")}
       </div>
-
     `;
+
+    chatContainer.scrollTop = chatContainer.scrollHeight;
 
   } catch (error) {
 
-    aiAnswer.innerHTML = `
+    const loadingEl = document.getElementById(loadingId);
+    if (loadingEl) loadingEl.remove();
 
-      <div class="timeline-event">
-
-        <h2>
-          Error
-        </h2>
-
-        <p>
-          Witness AI failed.
-        </p>
-
+    chatContainer.innerHTML += `
+      <div class="ai-message">
+        Witness AI failed. Please try again.
       </div>
-
     `;
 
     console.error(error);
-
   }
 
 }
 
 function quickWitness(question) {
-
-  document.getElementById(
-    "witnessSearch"
-  ).value =
-  question;
-
+  document.getElementById("witnessSearch").value = question;
   witnessSearch();
-
 }
 
-document
-.querySelectorAll(".question-card")
-.forEach(card => {
-
-  card.addEventListener(
-    "click",
-    () => {
-
-      quickWitness(
-        card.innerText.trim()
-      );
-
+document.getElementById("witnessSearch")
+  .addEventListener("keypress", function (event) {
+    if (event.key === "Enter") {
+      witnessSearch();
     }
-  );
-
-});
-
+  });

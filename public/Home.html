@@ -1,353 +1,115 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
 
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-<title>
-Madeleine McCann Research Archive
-</title>
+<title>PJ Archive Forensics</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
-<link rel="stylesheet" href="style.css">
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+<link rel="stylesheet" href="timeline.css">
+
 </head>
-<script>
 
-fetch("/me")
-
-.then(response => response.json())
-
-.then(data => {
-
-  console.log(data);
-
-  if (
-
-    data.authenticated &&
-
-    data.user.role === "admin"
-
-  ) {
-
-    document
-    .getElementById(
-      "adminBtn"
-    )
-    .style.display =
-    "block";
-
-  }
-
-})
-
-.catch(error => {
-
-  console.log(error);
-
-});
-
-</script>
 <body>
-
-<!-- NAVBAR -->
 
 <nav class="navbar">
 
 <div class="logo-container">
-    <img
-        src="daifferent-logo.png"
-        alt="dAIfferent"
-        class="logo-image">
+  <img src="daifferent-logo.png" alt="dAIfferent" class="logo-image">
 </div>
+
 <ul class="nav-links">
-
+<li><a href="Home.html">Home</a></li>
 <li><a href="witnesses.html">Witness Statements</a></li>
-
 <li><a href="Timeline.html">Timelines</a></li>
-
 <li><a href="Maps.html">Maps</a></li>
-
 <li><a href="forensics.html">Forensic Reports</a></li>
-
 <li><a href="photograph.html">Photographs</a></li>
-
 <li><a href="Interview_Transcript.html">Interview Transcripts</a></li>
-
 <li><a href="Phone.html">Phone Records</a></li>
-
 <li><a href="police.html">Police Notes</a></li>
-
 <li><a href="Rogatory.html">Rogatory Interviews</a></li>
-
-<li><a href="correspondence.html">Correspondence</a></li>   
-
+<li><a href="correspondence.html">Correspondence</a></li>
+<li><a href="theories.html">Theories</a></li>
 </ul>
 
 </nav>
 
-<!-- HERO -->
-
 <section class="hero">
-
 <div class="hero-content">
 
-<p class="tag">
-AI-Assisted Research Environment
-</p>
+<p class="tag">AI-ASSISTED CASE ARCHIVE</p>
 
 <h1>
 Madeleine McCann
-<span>Research Archive</span>
+<span>Forensics</span>
 </h1>
 
 <p>
-A structured investigation archive designed
-for document exploration, evidence navigation,
-timeline analysis, and AI-assisted research.
+Search forensic evidence,
+DNA findings,
+cadaver dog alerts,
+laboratory reports,
+and scientific analysis.
 </p>
 
-<div class="buttons">
-
-<a
-href="public-archive.html"
-class="primary-button">
-
-Open Archive
-
-</a>
-
-<button class="btn btn-secondary">
-Explore Timelines
-</button>
-
 </div>
-
-</div>
-
 </section>
 
-<!-- STATS -->
+<section class="timeline-search-section">
+<div class="timeline-search-box">
 
-<section class="stats">
+<h2>Forensics AI Search</h2>
+<p>Ask anything about forensic evidence.</p>
 
-<div class="stat-card">
-<h3>340+</h3>
-<p>Witness Files</p>
-</div>
-
-<div class="stat-card">
-<h3>40+</h3>
-<p>Forensic Reports</p>
-</div>
-
-<div class="stat-card">
-<h3>100+</h3>
-<p>Sighting Reports</p>
-</div>
-
-<div class="stat-card">
-<h3>AI Powered</h3>
-<p>Archive Search</p>
-</div>
-
-</section>
-
-<!-- AI SEARCH -->
-
-<section class="search-section">
-
-<div class="search-box">
-
-<h2>
-Conversational Archive Search
-</h2>
-
-<p>
-Ask questions across thousands
-of investigation documents.
-</p>
-
-<div class="search-area">
-
+<div class="timeline-search-area">
 <input
-type="text"
-id="timelineSearch"
-placeholder="Ask the archive a question...">
-
-<button onclick="aiSearch()">
-Search
-</button>
-
+  type="text"
+  id="forensicsSearch"
+  placeholder="Ask something about forensic evidence...">
+<button onclick="forensicsSearch()">AI Search</button>
 </div>
 
-<!-- AI ANSWER -->
-
-<div id="chatContainer" class="chat-container">
-
-<div class="welcome-chat">
-
-<h2>
-AI Investigation Assistant
-</h2>
-
-<p>
-Ask questions about the Madeleine McCann case.
-Your conversation will remain visible.
-</p>
-
-</div>
-
-</div>
-
-<!-- QUICK QUESTIONS -->
+<div id="aiAnswer"></div>
 
 <div class="questions">
 
-<div
-class="question-card"
-onclick="quickAsk('Which witnesses mentioned shutters?')">
-
-Which witnesses mentioned shutters?
-
+<div class="question-card" onclick="quickForensics('Explain the cadaver dog alerts.')">
+Explain the cadaver dog alerts.
 </div>
 
-<div
-class="question-card"
-onclick="quickAsk('Compare Gerry McCann timeline statements.')">
-
-Compare Gerry McCann timeline statements.
-
+<div class="question-card" onclick="quickForensics('What DNA evidence was found?')">
+What DNA evidence was found?
 </div>
 
-<div
-class="question-card"
-onclick="quickAsk('Summarise the Smith family sightings.')">
-
-Summarise the Smith family sightings.
-
+<div class="question-card" onclick="quickForensics('What were the forensic limitations?')">
+What were the forensic limitations?
 </div>
 
-<div
-class="question-card"
-onclick="quickAsk('Show all references to apartment 5A.')">
-
-Show all references to apartment 5A.
-
+<div class="question-card" onclick="quickForensics('What laboratory results were reported?')">
+What laboratory results were reported?
 </div>
 
-<div
-class="question-card"
-onclick="quickAsk('List timeline contradictions between interviews.')">
+<div class="question-card" onclick="quickForensics('What evidence was collected from Apartment 5A?')">
+What evidence was collected from Apartment 5A?
+</div>
 
-List timeline contradictions between interviews.
-
+<div class="question-card" onclick="quickForensics('Summarize all forensic findings.')">
+Summarize all forensic findings.
 </div>
 
 </div>
 
 </div>
-
 </section>
 
-
-<!-- AI SCRIPT -->
-<script src="app.js"></script>
-
-<!-- ADMIN BUTTON -->
-<button
-id="adminBtn"
-style="
-display:none;
-position:fixed;
-bottom:20px;
-right:20px;
-padding:12px 20px;
-background:#111827;
-color:white;
-border:none;
-border-radius:10px;
-cursor:pointer;
-font-weight:600;
-box-shadow:0 4px 12px rgba(0,0,0,.25);
-z-index:9999;
-">
-
-Admin Panel
-
-</button>
-
-<script>
-
-async function loadUser() {
-
-  try {
-
-    const response =
-    await fetch("/me");
-
-    const data =
-    await response.json();
-
-    console.log("USER:", data);
-
-    if (
-
-      data.authenticated &&
-
-      data.user &&
-
-      data.user.role === "admin"
-
-    ) {
-
-      document
-      .getElementById(
-        "adminBtn"
-      )
-      .style.display =
-      "block";
-
-    }
-
-  } catch (error) {
-
-    console.error(error);
-
-  }
-
-}
-
-loadUser();
-
-document
-.getElementById(
-  "adminBtn"
-)
-.addEventListener(
-  "click",
-  () => {
-
-    window.location.href =
-    "/dashboard.html";
-
-  }
-);
-
-</script>
+<script src="forensics.js"></script>
 
 </body>
 </html>
-
-
-
-
-</body>
-</html>
-
