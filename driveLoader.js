@@ -25,14 +25,22 @@ async function getDriveClient() {
     email,
     null,
     privateKey,
-    ["https://www.googleapis.com/auth/drive.readonly"]
+    [
+      "https://www.googleapis.com/auth/drive.readonly"
+    ]
   );
+
+  // TEST AUTHORIZATION
+  await auth.authorize();
+
+  console.log("[Drive] JWT Authorized");
 
   return google.drive({
     version: "v3",
     auth
   });
 }
+
 
 async function fetchAllDriveDocuments() {
 
