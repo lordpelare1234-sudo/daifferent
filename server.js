@@ -1,101 +1,112 @@
-  
-  require("dotenv").config();                          // 1. Load env vars FIRST
+require("dotenv").config();                          // 1. Load env vars FIRST
 
-  const express    = require("express");               // 2. Express
-  const session    = require("express-session");       // 3. Session (before app.use)
-  const axios      = require("axios");                 // 4. Axios
-  const supabase   = require("./supabase");            // 5. Supabase client
-  const masterCase = require("./public/masterCase");   // 6. Case archive
+const express    = require("express");               // 2. Express
+const session    = require("express-session");       // 3. Session (before app.use)
+const axios      = require("axios");                 // 4. Axios
+const supabase   = require("./supabase");            // 5. Supabase client
+const masterCase = require("./public/masterCase");   // 6. Case archive
+const { fetchAllDriveDocuments } = require("./driveLoader"); // 7. Google Drive
 
-  const upload =
-  require("./uploadConfig");
+const upload = require("./uploadConfig");
 
+const { createClient } = require("@supabase/supabase-js");
 
-const { createClient } =
-require("@supabase/supabase-js");
-
-const authClient =
-createClient(
-
+const authClient = createClient(
   process.env.SUPABASE_URL,
-
   process.env.SUPABASE_ANON_KEY
+);
 
+const app = express();
+
+app.use(express.json());
+app.use(express.static("public"));
+app.use(
+  session({
+    secret: process.env.SESSION_SECRET,
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      maxAge: 1000 * 60 * 60 * 24,
+    },
+  })
 );
 
 
-  
+// ====================
+// REUSABLE AI HELPER
+// ====================
 
-  const app = express();
+async function queryArchiveAI(systemPrompt, question) {
 
+  // 1. Try Google Drive first
+  let driveContent = "";
+  try {
+    driveContent = await fetchAllDriveDocuments();
+    console.log("[AI] Drive loaded, length:", driveContent.length);
+  } catch (err) {
+    console.error("[AI] Drive failed, falling back to masterCase:", err.message);
+  }
 
-  
+  // 2. Build context — Drive first, masterCase as fallback
+  const archiveContext = driveContent
+    ? `=== PRIMARY SOURCE: GOOGLE DRIVE ARCHIVE ===\n${driveContent}\n\n=== SECONDARY SOURCE: LOCAL ARCHIVE ===\n${masterCase}`
+    : `=== PRIMARY SOURCE: LOCAL ARCHIVE ===\n${masterCase}`;
 
-  app.use(express.json());
-  app.use(express.static("public"));
-  app.use(
-    session({
-      secret: process.env.SESSION_SECRET,
-      resave: false,
-      saveUninitialized: false,
-      cookie: {
-        maxAge: 1000 * 60 * 60 * 24,
+  // 3. Priority instruction
+  const priorityInstruction = `
+Source Priority Order:
+1. FIRST — Search the Google Drive archive documents (PRIMARY).
+2. SECOND — If not found in Drive, search the Local Archive (SECONDARY).
+3. THIRD — If not found in either, use broader knowledge of the Madeleine McCann case (FALLBACK — label clearly as "External Knowledge").
+Always state which source your answer came from.
+`;
+
+  const response = await axios.post(
+    "https://token-plan-sgp.xiaomimimo.com/v1/chat/completions",
+    {
+      model: "mimo-v2-pro",
+      messages: [
+        {
+          role: "system",
+          content: systemPrompt + "\n\n" + priorityInstruction,
+        },
+        {
+          role: "user",
+          content: archiveContext + "\n\nQuestion:\n" + question,
+        },
+      ],
+    },
+    {
+      headers: {
+        Authorization: `Bearer ${process.env.MIMO_API_KEY}`,
+        "Content-Type": "application/json",
       },
-    })
+    }
   );
 
+  return response.data.choices[0].message.content;
+}
 
-  // ====================
-  // REUSABLE AI HELPER
-  // ====================
-
-  async function queryArchiveAI(systemPrompt, question) {
-    const response = await axios.post(
-      "https://token-plan-sgp.xiaomimimo.com/v1/chat/completions",
-      {
-        model: "mimo-v2-pro",
-        
-        messages: [
-          {
-            role: "system",
-            content: systemPrompt,
-          },
-          {
-            role: "user",
-            content: masterCase + "\n\nQuestion:\n" + question,
-          },
-        ],
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${process.env.MIMO_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-      }
-    );
-
-    return response.data.choices[0].message.content;
-  }
-
-
-  // ====================
-  // ROUTE FACTORY
-  // ====================
-
-  function createRoute(router, path, systemPrompt, errorLabel) {
-    router.post(path, async (req, res) => {
-      try {
-        const answer = await queryArchiveAI(systemPrompt, req.body.question);
-        res.json({ answer });
-      } catch (error) {
-        console.error(`[${errorLabel}]`, error.response?.data || error.message);
-        res.json({ answer: `${errorLabel} Error` });
-      }
-    });
-  }
 
 // ====================
-// SYSTEM PROMPTS (Updated)
+// ROUTE FACTORY
+// ====================
+
+function createRoute(router, path, systemPrompt, errorLabel) {
+  router.post(path, async (req, res) => {
+    try {
+      const answer = await queryArchiveAI(systemPrompt, req.body.question);
+      res.json({ answer });
+    } catch (error) {
+      console.error(`[${errorLabel}]`, error.response?.data || error.message);
+      res.json({ answer: `${errorLabel} Error` });
+    }
+  });
+}
+
+
+// ====================
+// SYSTEM PROMPTS
 // ====================
 
 const prompts = {
@@ -117,7 +128,7 @@ Label your response sections:
 - Confirmed Facts
 - Witness Statements / Police Records / Forensic Findings (where applicable)
 - Theories (clearly marked as theories, not facts)
-- Source Used: [Archive / External Knowledge / Both]
+- Source Used: [Google Drive / Local Archive / External Knowledge / Both]
 
 Never invent evidence. Never present theories as facts. Remain neutral.
 `,
@@ -384,723 +395,277 @@ Rules:
 `,
 
 };
-  console.log(Object.keys(prompts));
+
+console.log(Object.keys(prompts));
 
 
-  // ====================
-  // AI ROUTES
-  // ====================
+// ====================
+// AI ROUTES
+// ====================
 
-  createRoute(app, "/ai-search",              prompts.aiSearch,       "Archive AI");
-  createRoute(app, "/timeline-search",        prompts.timeline,       "Timeline AI");
-  createRoute(app, "/witness-search",         prompts.witness,        "Witness AI");
-  createRoute(app, "/forensics-search",       prompts.forensics,      "Forensics AI");
-  createRoute(app, "/phone-search",           prompts.phone,          "Phone AI");
-  createRoute(app, "/maps-search",            prompts.maps,           "Maps AI");
-  createRoute(app, "/photograph-search",      prompts.photographs,    "Photograph AI");
-  createRoute(app, "/transcript-search",      prompts.transcripts,    "Transcript AI");
-  createRoute(app, "/correspondence-search",  prompts.correspondence, "Correspondence AI");
-  createRoute(app, "/police-search",          prompts.police,         "Police AI");
-  createRoute(app, "/theories-search",        prompts.theories,       "Theories AI");
-  createRoute(app, "/rogatory-search",        prompts.rogatory,       "Rogatory AI");
-
-
-  // ====================
-  // AUTH ROUTES
-  // ====================
+createRoute(app, "/ai-search",              prompts.aiSearch,       "Archive AI");
+createRoute(app, "/timeline-search",        prompts.timeline,       "Timeline AI");
+createRoute(app, "/witness-search",         prompts.witness,        "Witness AI");
+createRoute(app, "/forensics-search",       prompts.forensics,      "Forensics AI");
+createRoute(app, "/phone-search",           prompts.phone,          "Phone AI");
+createRoute(app, "/maps-search",            prompts.maps,           "Maps AI");
+createRoute(app, "/photograph-search",      prompts.photographs,    "Photograph AI");
+createRoute(app, "/transcript-search",      prompts.transcripts,    "Transcript AI");
+createRoute(app, "/correspondence-search",  prompts.correspondence, "Correspondence AI");
+createRoute(app, "/police-search",          prompts.police,         "Police AI");
+createRoute(app, "/theories-search",        prompts.theories,       "Theories AI");
+createRoute(app, "/rogatory-search",        prompts.rogatory,       "Rogatory AI");
 
 
-  app.post("/login", async (req, res) => {
+// ====================
+// AUTH ROUTES
+// ====================
 
-    try {
+app.post("/login", async (req, res) => {
+  try {
+    const { email, password } = req.body;
 
-      const {
-        email,
-        password
-      } = req.body;
+    const result = await authClient.auth.signInWithPassword({ email, password });
 
-      
-const result =
-await authClient.auth.signInWithPassword({
+    if (result.error) {
+      return res.json({ success: false, message: result.error.message });
+    }
 
+    req.session.user = {
+      id: result.data.user.id,
+      email: result.data.user.email
+    };
 
-        email,
-        password
-
-      });
-
-      if (result.error) {
-
-        return res.json({
-
-          success: false,
-
-          message:
-          result.error.message
-
-        });
-
+    req.session.save((err) => {
+      if (err) {
+        console.log("SESSION SAVE ERROR:", err);
+        return res.status(500).json({ success: false, message: "Session save failed" });
       }
+      console.log("LOGIN SUCCESS");
+      res.json({ success: true, message: "Login successful" });
+    });
 
-      req.session.user = {
+  } catch (err) {
+    console.log("LOGIN ERROR:", err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
 
-        id:
-        result.data.user.id,
+app.get("/me", async (req, res) => {
+  if (!req.session.user) {
+    return res.json({ authenticated: false });
+  }
 
-        email:
-        result.data.user.email
-
-      };
-
-      req.session.save((err) => {
-
-        if (err) {
-
-          console.log(
-            "SESSION SAVE ERROR:"
-          );
-
-          console.log(err);
-
-          return res.status(500).json({
-
-            success: false,
-
-            message:
-            "Session save failed"
-
-          });
-
-        }
-
-        console.log(
-          "LOGIN SUCCESS"
-        );
-
-        console.log(
-          JSON.stringify(
-            req.session,
-            null,
-            2
-          )
-        );
-
-        res.json({
-
-          success: true,
-
-          message:
-          "Login successful"
-
-        });
-
-      });
-
-    } catch (err) {
-
-      console.log(
-        "LOGIN ERROR:"
-      );
-
-      console.log(err);
-
-      res.status(500).json({
-
-        success: false,
-
-        message:
-        err.message
-
-      });
-
-    }
-
-  });
-
-
-
-
-
-
-
-  app.get("/me", async (req, res) => {
-
-    if (!req.session.user) {
-
-      return res.json({
-
-        authenticated:false
-
-      });
-
-    }
-
-    const { data, error } =
-    await supabase
+  const { data, error } = await supabase
     .from("profiles")
     .select("*")
-    .eq(
-      "id",
-      req.session.user.id
-    );
+    .eq("id", req.session.user.id);
+
+  if (error) {
+    return res.json({ authenticated: false, reason: error.message });
+  }
+
+  if (!data || data.length === 0) {
+    return res.json({
+      authenticated: true,
+      user: {
+        id: req.session.user.id,
+        username: req.session.user.email,
+        role: "user"
+      }
+    });
+  }
+
+  res.json({ authenticated: true, user: data[0] });
+});
+
+app.post("/logout", (req, res) => {
+  req.session.destroy(() => {
+    res.json({ success: true });
+  });
+});
+
+app.post("/upload", upload.single("file"), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.json({ success: false, message: "No file uploaded" });
+    }
+
+    const fileName = Date.now() + "_" + req.file.originalname;
+
+    const { data, error } = await supabase.storage
+      .from("archive-documents")
+      .upload(fileName, req.file.buffer, { contentType: req.file.mimetype });
 
     if (error) {
-
-      return res.json({
-
-        authenticated:false,
-
-        reason:error.message
-
-      });
-
+      console.log(error);
+      return res.json({ success: false, message: error.message });
     }
 
-    if(!data || data.length === 0){
-
-      return res.json({
-
-        authenticated:true,
-
-        user:{
-
-          id:req.session.user.id,
-
-          username:req.session.user.email,
-
-          role:"user"
-
-        }
-
-      });
-
-    }
-
-    res.json({
-
-      authenticated:true,
-
-      user:data[0]
-
-    });
-
-  });
-
-
-
-
-
-  app.post("/logout",(req,res)=>{
-
-    req.session.destroy(()=>{
-
-      res.json({
-
-        success:true
-
-      });
-
-    });
-
-  });
-
-
-  app.post(
-
-    "/upload",
-
-    upload.single("file"),
-
-    async (req,res)=>{
-
-      try{
-
-        if(!req.file){
-
-          return res.json({
-
-            success:false,
-
-            message:
-            "No file uploaded"
-
-          });
-
-        }
-
-        const fileName =
-
-        Date.now() +
-
-        "_" +
-
-        req.file.originalname;
-
-        const { data,error } =
-
-        await supabase
-        .storage
-        .from(
-          "archive-documents"
-        )
-        .upload(
-
-          fileName,
-
-          req.file.buffer,
-
-          {
-
-            contentType:
-            req.file.mimetype
-
-          }
-
-        );
-
-        if(error){
-
-          console.log(error);
-
-          return res.json({
-
-            success:false,
-
-            message:
-            error.message
-
-          });
-
-        }
-
-        res.json({
-
-          success:true,
-
-          message:
-          "File uploaded successfully",
-
-          file:data
-
-        });
-
-      }
-
-      catch(error){
-
-        console.log(error);
-
-        res.status(500).json({
-
-          success:false,
-
-          message:
-          error.message
-
-        });
-
-      }
-
-    }
-  );
-
-
-
-
-
-
-
-app.get("/files", async (req,res)=>{
-
-  try{
-
-    const { data,error } =
-
-    await supabase
-    .storage
-    .from("archive-documents")
-    .list("",{
-      limit:1000,
-      offset:0,
-      sortBy:{
-        column:"name",
-        order:"asc"
-      }
-    });
+    res.json({ success: true, message: "File uploaded successfully", file: data });
+
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+app.get("/files", async (req, res) => {
+  try {
+    const { data, error } = await supabase.storage
+      .from("archive-documents")
+      .list("", { limit: 1000, offset: 0, sortBy: { column: "name", order: "asc" } });
 
     console.log("FILES ROUTE HIT");
     console.log("FILES:", data);
     console.log("ERROR:", error);
 
-    if(error){
-
-      return res.json({
-        success:false,
-        message:error.message
-      });
-
+    if (error) {
+      return res.json({ success: false, message: error.message });
     }
 
-    return res.json({
-      success:true,
-      files:data || []
-    });
+    return res.json({ success: true, files: data || [] });
 
-  }
-
-  catch(err){
-
+  } catch (err) {
     console.log(err);
+    return res.json({ success: false, message: err.message });
+  }
+});
 
-    return res.json({
-      success:false,
-      message:err.message
-    });
+app.get("/file-url/:name", async (req, res) => {
+  try {
+    const fileName = req.params.name;
 
+    const { data, error } = await supabase.storage
+      .from("archive-documents")
+      .createSignedUrl(fileName, 3600);
+
+    if (error) {
+      return res.json({ success: false, message: error.message });
+    }
+
+    res.json({ success: true, url: data.signedUrl });
+
+  } catch (error) {
+    res.json({ success: false, message: error.message });
+  }
+});
+
+app.post("/save-record", async (req, res) => {
+  try {
+    const { title, category, record_date, source, summary, content } = req.body;
+
+    const { error } = await supabase
+      .from("archive_records")
+      .insert([{ title, category, record_date, source, summary, content }]);
+
+    if (error) {
+      return res.json({ success: false, message: error.message });
+    }
+
+    res.json({ success: true });
+
+  } catch (error) {
+    res.json({ success: false, message: error.message });
+  }
+});
+
+app.get("/records", async (req, res) => {
+  const { data, error } = await supabase
+    .from("archive_records")
+    .select("*")
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    return res.json({ success: false });
   }
 
+  res.json({ success: true, records: data });
 });
 
+app.delete("/delete-file/:name", async (req, res) => {
+  try {
+    const fileName = req.params.name;
 
-
-
-
-
-  app.get("/file-url/:name", async (req,res)=>{
-
-    try{
-
-      const fileName =
-      req.params.name;
-
-      const { data,error } =
-
-      await supabase
-      .storage
+    const { error } = await supabase.storage
       .from("archive-documents")
-      .createSignedUrl(
+      .remove([fileName]);
 
-        fileName,
-
-        3600
-
-      );
-
-      if(error){
-
-        return res.json({
-
-          success:false,
-
-          message:error.message
-
-        });
-
-      }
-
-      res.json({
-
-        success:true,
-
-        url:data.signedUrl
-
-      });
-
+    if (error) {
+      return res.json({ success: false, message: error.message });
     }
 
-    catch(error){
+    res.json({ success: true, message: "File deleted" });
 
-      res.json({
-
-        success:false,
-
-        message:error.message
-
-      });
-
-    }
-
-  });
-
-app.post("/save-record", async(req,res)=>{
-
-try{
-
-const {
-
-title,
-category,
-record_date,
-source,
-summary,
-content
-
-} = req.body;
-
-const { error } =
-
-await supabase
-
-.from("archive_records")
-
-.insert([{
-
-title,
-category,
-record_date,
-source,
-summary,
-content
-
-}]);
-
-if(error){
-
-return res.json({
-
-success:false,
-message:error.message
-
-});
-
-}
-
-res.json({
-
-success:true
-
-});
-
-}
-catch(error){
-
-res.json({
-
-success:false,
-message:error.message
-
-});
-
-}
-
-});
-
-
-app.get("/records", async(req,res)=>{
-
-const { data,error } =
-
-await supabase
-
-.from("archive_records")
-
-.select("*")
-
-.order("created_at",{
-
-ascending:false
-
-});
-
-if(error){
-
-return res.json({
-
-success:false
-
-});
-
-}
-
-res.json({
-
-success:true,
-records:data
-
-});
-
-});
-
-
-
-  app.delete("/delete-file/:name", async (req,res)=>{
-
-    try{
-
-      const fileName =
-      req.params.name;
-
-      const { error } =
-
-      await supabase
-      .storage
-      .from("archive-documents")
-      .remove([
-        fileName
-      ]);
-
-      if(error){
-
-        return res.json({
-
-          success:false,
-
-          message:error.message
-
-        });
-
-      }
-
-      res.json({
-
-        success:true,
-
-        message:"File deleted"
-
-      });
-
-    }
-
-    catch(error){
-
-      res.json({
-
-        success:false,
-
-        message:error.message
-
-      });
-
-    }
-
-  });
-
-
-app.post("/signup", async (req,res)=>{
-
-  try{
-
-    const {
-
-      email,
-      password
-
-    } = req.body;
-
-    const result =
-
-    await authClient
-    .auth
-    .signUp({
-
-      email,
-      password
-
-    });
-
-    if(result.error){
-
-      return res.json({
-
-        success:false,
-
-        message:
-        result.error.message
-
-      });
-
-    }
-
-    const userId =
-
-    result.data.user.id;
-
-    const { error } =
-
-    await supabase
-    .from("profiles")
-    .insert({
-
-      id:userId,
-
-      username:email,
-
-      role:"user"
-
-    });
-
-    if(error){
-
-      return res.json({
-
-        success:false,
-
-        message:error.message
-
-      });
-
-    }
-
-    res.json({
-
-      success:true,
-
-      message:
-      "Account created successfully"
-
-    });
-
+  } catch (error) {
+    res.json({ success: false, message: error.message });
   }
+});
 
-  catch(error){
+app.post("/signup", async (req, res) => {
+  try {
+    const { email, password } = req.body;
 
+    const result = await authClient.auth.signUp({ email, password });
+
+    if (result.error) {
+      return res.json({ success: false, message: result.error.message });
+    }
+
+    const userId = result.data.user.id;
+
+    const { error } = await supabase
+      .from("profiles")
+      .insert({ id: userId, username: email, role: "user" });
+
+    if (error) {
+      return res.json({ success: false, message: error.message });
+    }
+
+    res.json({ success: true, message: "Account created successfully" });
+
+  } catch (error) {
     console.log(error);
+    res.json({ success: false, message: error.message });
+  }
+});
 
-    res.json({
+app.get("/public-files", async (req, res) => {
+  const { data, error } = await supabase.storage
+    .from("archive-documents")
+    .list();
 
-      success:false,
-
-      message:error.message
-
-    });
-
+  if (error) {
+    return res.json({ success: false, message: error.message });
   }
 
-});
-
-
-app.get("/public-files", async (req,res)=>{
-
-const { data, error } =
-
-await supabase.storage
-.from("archive-documents")
-.list();
-
-if(error){
-
-return res.json({
-success:false,
-message:error.message
-});
-
-}
-
-res.json({
-
-success:true,
-files:data
-
-});
-
+  res.json({ success: true, files: data });
 });
 
 app.get("/", (req, res) => {
   res.sendFile(__dirname + "/public/login.html");
 });
-  // START SERVER
-  // ====================
 
-  app.listen(5000, () => {
-    console.log("RUNNING ON PORT 5000");
-  });
+app.get("/test-drive", async (req, res) => {
+  try {
+    const result = await fetchAllDriveDocuments();
+    res.json({ success: true, length: result.length, preview: result.substring(0, 200) });
+  } catch (err) {
+    res.json({ success: false, error: err.message });
+  }
+});
+app.get("/test-drive", async (req, res) => {
+  try {
+    const result = await fetchAllDriveDocuments();
+    res.json({ success: true, length: result.length, preview: result.substring(0, 200) });
+  } catch (err) {
+    res.json({ success: false, error: err.message });
+  }
+});
+// ====================
+// START SERVER
+// ====================
+
+app.listen(5000, () => {
+  console.log("RUNNING ON PORT 5000");
+});
