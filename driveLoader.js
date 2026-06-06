@@ -28,23 +28,26 @@ async function getDriveClient() {
     privateKey.substring(0, 40)
   );
 
-  const auth = new google.auth.JWT(
-    email,
-    null,
-    privateKey,
-    [
-      "https://www.googleapis.com/auth/drive.readonly"
-    ]
-  );
+const auth = new google.auth.GoogleAuth({
+  credentials: {
+    client_email: email,
+    private_key: privateKey,
+  },
+  scopes: [
+    "https://www.googleapis.com/auth/drive.readonly"
+  ],
+});
 
-  await auth.authorize();
+const authClient = await auth.getClient();
 
-  console.log("[Drive] JWT Authorized");
+console.log("[Drive] Auth Client Created");
 
-  return google.drive({
-    version: "v3",
-    auth
-  });
+return google.drive({
+  version: "v3",
+  auth: authClient,
+});
+
+
 }
 
 
