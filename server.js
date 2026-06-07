@@ -34,7 +34,7 @@ app.use(session({
 
 
 // ─────────────────────────────────────────────────────────────
-// LAYER 1 — IN-PROCESS MEMORY CACHE  (< 1ms, lives with process)
+// LAYER 1 — IN-PROCESS MEMORY CACHE
 // ─────────────────────────────────────────────────────────────
 
 const memCache = new Map();
@@ -45,11 +45,10 @@ function cacheKey(route, q) { return `${route}::${q}`; }
 
 
 // ─────────────────────────────────────────────────────────────
-// LAYER 2 — SUPABASE CACHE  (persists across restarts)
-// Only read on memory miss. Write is always fire-and-forget.
+// LAYER 2 — SUPABASE CACHE (5 minute TTL)
 // ─────────────────────────────────────────────────────────────
 
-const CACHE_TTL_DAYS = 15;
+const CACHE_TTL_MINS = 5;
 
 async function dbGet(route, question) {
   try {
@@ -58,14 +57,13 @@ async function dbGet(route, question) {
       .select("answer")
       .eq("route", route)
       .eq("question", question)
-      .gt("created_at", new Date(Date.now() - 1000 * 60 * 60 * 24 * CACHE_TTL_DAYS).toISOString())
+      .gt("created_at", new Date(Date.now() - 1000 * 60 * CACHE_TTL_MINS).toISOString())
       .single();
     return data ? data.answer : null;
   } catch (_) { return null; }
 }
 
 function dbSet(route, question, answer) {
-  // Fire-and-forget — never blocks the response
   supabase
     .from("question_cache")
     .upsert({ route, question, answer, hit_count: 1 }, { onConflict: "route,question" })
@@ -91,53 +89,69 @@ const prompts = {
 
   aiSearch: `You are PJ Archive AI, an expert assistant on the Madeleine McCann investigation.
 Answer questions using the supplied archive documents as your primary source.
-Supplement with broader case knowledge if needed — label it clearly.
+Supplement with broader case knowledge if needed — label it clearly as [External Knowledge].
+When asked about any person — even peripheral figures, friends, acquaintances, or minor contacts — search thoroughly across ALL document types: witness statements, rogatory interviews, phone records, correspondence, police reports, and transcripts. They may appear as a secondary reference rather than a primary subject.
+If a person is not a central figure, clearly explain their role, how they connect to key witnesses or suspects, and what documents reference them.
+Maintain a natural, conversational tone. Answer follow-up questions with full awareness of the prior conversation — if the user says "what else did she say" or "what about the timeline", you know who and what they are referring to.
 If the question is unrelated to the case, reply only: "Sorry, I can only answer questions about the Madeleine McCann case."
-Structure responses as: Confirmed Facts | Witness/Police/Forensic Findings | Theories (labelled) | Source Used.
+Structure responses as: Who They Are | Confirmed Facts from Archive | Connections to Key Figures | Source Used.
 Never invent evidence. Never present theories as facts. Remain neutral.`,
 
   timeline: `You are PJ Timeline AI, specialist in the chronological record of the Madeleine McCann case.
-Specialise in: precise dates/times, chronological sequencing, movements of all parties, contradictions and gaps.
+Specialise in: precise dates/times, chronological sequencing, movements of all parties — including peripheral contacts and acquaintances — contradictions and gaps.
+Maintain a natural conversational tone across follow-up questions. If the user references "she", "he", "they" or "that night", use the conversation history to understand who and what they mean.
+When a person is mentioned, trace their movements and any communications involving them across the full timeline.
 Be precise with dates and times. Note disputes clearly. Highlight contradictions. Keep to 1-3 paragraphs.`,
 
   witness: `You are PJ Witness AI, specialist in witness testimony in the Madeleine McCann case.
 Specialise in: statements, sighting reports, key claims, contradictions within and between accounts.
+When asked about a person, check whether they appear in ANY witness statement — not just as the primary subject but as someone mentioned by another witness.
+Maintain a natural conversational tone. Answer follow-up questions with full awareness of prior exchanges — "what else did she say" or "any contradictions" should be answered in context.
 Accurately represent statements. Identify witnesses by name. Highlight contradictions. Keep to 1-3 paragraphs.`,
 
   forensics: `You are PJ Forensics AI, specialist in physical and scientific evidence in the Madeleine McCann case.
 Specialise in: DNA, cadaver/blood dogs (Eddie/Keela), luminol, lab reports, chain of custody, forensic limitations.
+Maintain a natural conversational tone across follow-up questions.
 Be precise about what was found, where, and what labs concluded. Note all limitations. Do not overstate. Keep to 1-3 paragraphs.`,
 
   phone: `You are PJ Phone Records AI, specialist in telecommunications evidence in the Madeleine McCann case.
 Specialise in: call records, SMS, cell tower data, communications timelines, contact analysis.
+Maintain a natural conversational tone across follow-up questions.
 Be precise about times, durations, parties. Cross-reference with timeline. Highlight contradictions. Keep to 1-3 paragraphs.`,
 
   maps: `You are PJ Maps AI, specialist in locations and spatial analysis in the Madeleine McCann case.
 Specialise in: Praia da Luz locations, Ocean Club layout, Apartment 5A, distances, routes, geographic context for sightings.
+Maintain a natural conversational tone across follow-up questions.
 Be precise about distances and spatial relationships. Relate to events and witness accounts. Keep to 1-3 paragraphs.`,
 
   photographs: `You are PJ Photograph AI, specialist in photographic and visual evidence in the Madeleine McCann case.
 Specialise in: holiday photographs, CCTV records, visual evidence analysis, metadata, evidentiary significance.
+Maintain a natural conversational tone across follow-up questions.
 Be precise about what images show and do not show. Do not speculate beyond documentation. Keep to 1-3 paragraphs.`,
 
   transcripts: `You are PJ Transcript AI, specialist in interview transcripts in the Madeleine McCann case.
 Specialise in: transcripts, police interview content, key statements, admissions, denials, contradictions across sessions.
+Maintain a natural conversational tone across follow-up questions. If the user says "what did she say next" or "any contradictions", answer in context.
 Quote or paraphrase accurately. Identify subject and date. Highlight contradictions. Keep to 1-3 paragraphs.`,
 
   correspondence: `You are PJ Correspondence AI, specialist in written communications in the Madeleine McCann case.
 Specialise in: police/prosecutor/legal letters, inter-agency communications, official decisions made in writing.
+Maintain a natural conversational tone across follow-up questions.
 Be precise about sender, recipient, date. Accurately represent content. Highlight significant claims. Keep to 1-3 paragraphs.`,
 
   police: `You are PJ Police Records AI, specialist in official investigative actions in the Madeleine McCann case.
 Specialise in: initial response, search operations, arguido status, PJ/GNR/Met/Operation Grange, official reports, documented failures.
+Maintain a natural conversational tone across follow-up questions.
 Be precise about dates, agencies, actions. Distinguish between bodies. Represent criticisms fairly. Keep to 1-3 paragraphs.`,
 
   theories: `You are PJ Theories AI, specialist in evaluating hypotheses in the Madeleine McCann case.
 Specialise in: comparing theories against evidence, separating fact from inference/speculation, evidentiary weight, logical gaps.
+Maintain a natural conversational tone across follow-up questions.
 Always label fact vs theory. Present all significant theories fairly. Identify supporting/contradicting evidence. Never endorse beyond the evidence. Keep to 1-3 paragraphs.`,
 
   rogatory: `You are PJ Rogatory AI, specialist in rogatory interview material in the Madeleine McCann case.
 Specialise in: UK rogatory interviews (2007-2008+), Tapas group statements, contradictions vs earlier Portuguese accounts, refusals to answer.
+Maintain a natural conversational tone across follow-up questions. If the user says "what else" or "and the timeline", answer in context of the prior exchange.
 Identify interviewee and date. Accurately quote/paraphrase. Highlight contradictions. Keep to 1-3 paragraphs.`,
 
 };
@@ -146,10 +160,55 @@ console.log("[Routes] Prompts loaded:", Object.keys(prompts).join(", "));
 
 
 // ─────────────────────────────────────────────────────────────
+// FOLLOW-UP DETECTOR
+// Detects short conversational replies that don't need a Drive search
+// ─────────────────────────────────────────────────────────────
+
+function isConversationalFollowUp(question) {
+  const q = question.trim().toLowerCase();
+
+  const wordCount = q.split(/\s+/).length;
+  if (wordCount > 8) return false;
+
+  const followUpPatterns = [
+    /^so /,
+    /^and /,
+    /^but /,
+    /^what about/,
+    /^what else/,
+    /^tell me more/,
+    /^really\?/,
+    /^are they/,
+    /^were they/,
+    /^is (she|he|it|that)/,
+    /^was (she|he|it|that)/,
+    /^did (she|he|they)/,
+    /^how (so|did|does|was|were)/,
+    /^why (did|was|were|is)/,
+    /^(so )?(they|she|he) (are|were|is|was)/,
+    /^any (more|other|idea)/,
+    /^what happened (then|next|after)/,
+    /^(and )?what did (she|he|they)/,
+    /^(so )?friend/,
+    /^correct\??$/,
+    /^right\??$/,
+    /^interesting/,
+    /^makes sense/,
+    /^go on/,
+    /^continue/,
+    /^explain/,
+    /^elaborate/,
+  ];
+
+  return followUpPatterns.some(p => p.test(q));
+}
+
+
+// ─────────────────────────────────────────────────────────────
 // CORE PIPELINE
 // ─────────────────────────────────────────────────────────────
 
-async function queryArchiveAI(systemPrompt, question, route) {
+async function queryArchiveAI(systemPrompt, question, route, history = []) {
   const q = question.trim().toLowerCase();
 
   // 1. Instant greeting — zero cost
@@ -158,42 +217,60 @@ async function queryArchiveAI(systemPrompt, question, route) {
     return GREETING_REPLY;
   }
 
-  const key = cacheKey(route, q);
+  // 2. Detect follow-up type
+  const isFollowUp      = history.length > 0;
+  const isShortFollowUp = isFollowUp && isConversationalFollowUp(question);
+  const key             = cacheKey(route, q);
 
-  // 2. Memory cache — < 1ms
-  const memHit = memGet(key);
-  if (memHit) {
-    console.log(`[Cache] MEM HIT: ${q.substring(0, 60)}`);
-    return memHit;
-  }
+  // 3. Cache check — only for standalone questions
+  if (!isFollowUp) {
+    const memHit = memGet(key);
+    if (memHit) {
+      console.log(`[Cache] MEM HIT: ${q.substring(0, 60)}`);
+      return memHit;
+    }
 
-  // 3. Supabase cache — survives restarts
-  const dbHit = await dbGet(route, q);
-  if (dbHit) {
-    console.log(`[Cache] DB HIT: ${q.substring(0, 60)}`);
-    memSet(key, dbHit); // warm memory for next call
-    return dbHit;
+    const dbHit = await dbGet(route, q);
+    if (dbHit) {
+      console.log(`[Cache] DB HIT: ${q.substring(0, 60)}`);
+      memSet(key, dbHit);
+      return dbHit;
+    }
   }
 
   console.log(`[Cache] MISS — calling AI: ${q.substring(0, 60)}`);
 
-  // 4. Smart retrieval — top 3 docs, max 8,000 chars, pure in-memory
-  const { context, sourceNote } = await retrieveRelevantContext(question);
+  // 4. Drive retrieval — skip for short conversational follow-ups
+  let archiveContext = "";
 
-  const archiveContext = context
-    ? `=== ARCHIVE SOURCES: ${sourceNote} ===\n\n${context}`
-    : "=== ARCHIVE: No matching documents found. Use external case knowledge and label it. ===";
+  if (!isShortFollowUp) {
+    const { context, sourceNote } = await retrieveRelevantContext(question);
+    archiveContext = context
+      ? `=== ARCHIVE SOURCES: ${sourceNote} ===\n\n${context}`
+      : "=== ARCHIVE: No matching documents found. Use external case knowledge and label it. ===";
+    console.log(`[AI] ${archiveContext.length} chars (~${Math.round(archiveContext.length / 4)} tokens) | ${sourceNote}`);
+  } else {
+    console.log(`[AI] Short follow-up — answering from conversation history only`);
+  }
 
-  console.log(`[AI] ${archiveContext.length} chars (~${Math.round(archiveContext.length / 4)} tokens) | ${sourceNote}`);
+  // 5. Build messages — history + current question
+  const userContent = isShortFollowUp
+    ? question
+    : archiveContext + "\n\nQuestion:\n" + question;
 
-  // 5. AI call
+  const messages = [
+    ...history,
+    { role: "user", content: userContent },
+  ];
+
+  // 6. AI call
   const response = await axios.post(
     "https://token-plan-sgp.xiaomimimo.com/v1/chat/completions",
     {
       model: "mimo-v2-pro",
       messages: [
         { role: "system", content: systemPrompt + SOURCE_RULE },
-        { role: "user",   content: archiveContext + "\n\nQuestion:\n" + question },
+        ...messages,
       ],
     },
     {
@@ -201,15 +278,17 @@ async function queryArchiveAI(systemPrompt, question, route) {
         Authorization:  `Bearer ${process.env.MIMO_API_KEY}`,
         "Content-Type": "application/json",
       },
-      timeout: 30000, // 30s hard timeout on AI call
+      timeout: 30000,
     }
   );
 
   const answer = response.data.choices[0].message.content;
 
-  // 6. Cache result — memory instantly, DB fire-and-forget
-  memSet(key, answer);
-  dbSet(route, q, answer);
+  // 7. Cache only standalone questions
+  if (!isFollowUp) {
+    memSet(key, answer);
+    dbSet(route, q, answer);
+  }
 
   return answer;
 }
@@ -222,9 +301,10 @@ async function queryArchiveAI(systemPrompt, question, route) {
 function createRoute(path, promptKey) {
   app.post(path, async (req, res) => {
     const question = (req.body.question || "").trim();
+    const history  = req.body.history  || [];
     if (!question) return res.json({ answer: "Please enter a question." });
     try {
-      const answer = await queryArchiveAI(prompts[promptKey], question, path);
+      const answer = await queryArchiveAI(prompts[promptKey], question, path, history);
       res.json({ answer });
     } catch (err) {
       console.error(`[${promptKey}]`, err.response?.data || err.message);
@@ -422,7 +502,7 @@ app.get("/", (req, res) => {
 
 
 // ─────────────────────────────────────────────────────────────
-// START — server listens immediately, Drive builds in background
+// START
 // ─────────────────────────────────────────────────────────────
 
 app.listen(5000, () => {
