@@ -10,7 +10,6 @@ const {
   isGreeting,
   retrieveRelevantContext,
   fetchAllDriveDocuments,
-  detectCategory,
   extractPersonName,
 } = require("./driveLoader");
 
@@ -34,7 +33,7 @@ app.use(session({
 
 
 // ─────────────────────────────────────────────────────────────
-// LAYER 1 — IN-PROCESS MEMORY CACHE
+// CACHE
 // ─────────────────────────────────────────────────────────────
 
 const memCache = new Map();
@@ -42,11 +41,6 @@ const memCache = new Map();
 function memGet(key)        { return memCache.get(key) || null; }
 function memSet(key, value) { memCache.set(key, value); }
 function cacheKey(route, q) { return `${route}::${q}`; }
-
-
-// ─────────────────────────────────────────────────────────────
-// LAYER 2 — SUPABASE CACHE (5 minute TTL)
-// ─────────────────────────────────────────────────────────────
 
 const CACHE_TTL_MINS = 5;
 
@@ -80,104 +74,51 @@ const GREETING_REPLY = "Hello! I specialise in the Madeleine McCann archive. Wha
 
 
 // ─────────────────────────────────────────────────────────────
-// SYSTEM PROMPTS
+// SYSTEM PROMPT
 // ─────────────────────────────────────────────────────────────
 
-const SOURCE_RULE = "\n\nSource priority: (1) Provided archive documents — always cite which document. (2) Broader Madeleine McCann case knowledge if archive is insufficient — label clearly as [External Knowledge].";
+const SYSTEM_PROMPT = `You are an expert on the Madeleine McCann case with access to the original PJ archive documents.
 
-const prompts = {
+You are having a real one-on-one conversation with someone who wants to understand this case. Talk like a knowledgeable person having a genuine discussion — not like a search engine, not like a report writer.
 
-  aiSearch: `You are PJ Archive AI, an expert assistant on the Madeleine McCann investigation.
-Answer questions using the supplied archive documents as your primary source.
-Supplement with broader case knowledge if needed — label it clearly as [External Knowledge].
-When asked about any person — even peripheral figures, friends, acquaintances, or minor contacts — search thoroughly across ALL document types: witness statements, rogatory interviews, phone records, correspondence, police reports, and transcripts. They may appear as a secondary reference rather than a primary subject.
-If a person is not a central figure, clearly explain their role, how they connect to key witnesses or suspects, and what documents reference them.
-Maintain a natural, conversational tone. Answer follow-up questions with full awareness of the prior conversation — if the user says "what else did she say" or "what about the timeline", you know who and what they are referring to.
-If the question is unrelated to the case, reply only: "Sorry, I can only answer questions about the Madeleine McCann case."
-Structure responses as: Who They Are | Confirmed Facts from Archive | Connections to Key Figures | Source Used.
-Never invent evidence. Never present theories as facts. Remain neutral.`,
+HOW TO ANSWER:
+- Read every document provided carefully before answering
+- Answer directly from what the documents say — use the actual details, names, times, and facts in them
+- If the documents mention something relevant, use it — do not ignore details
+- If the archive doesn't cover it, use your broader knowledge of the case and say so naturally ("From what I know outside the archive...")
+- Never say you couldn't find something or ask the user to provide more files — just answer
+- Never make up facts or present theories as confirmed
 
-  timeline: `You are PJ Timeline AI, specialist in the chronological record of the Madeleine McCann case.
-Specialise in: precise dates/times, chronological sequencing, movements of all parties — including peripheral contacts and acquaintances — contradictions and gaps.
-Maintain a natural conversational tone across follow-up questions. If the user references "she", "he", "they" or "that night", use the conversation history to understand who and what they mean.
-When a person is mentioned, trace their movements and any communications involving them across the full timeline.
-Be precise with dates and times. Note disputes clearly. Highlight contradictions. Keep to 1-3 paragraphs.`,
+HOW TO TALK:
+- Speak naturally and conversationally — like you're explaining this to a friend who is genuinely curious
+- Keep responses focused and clear — don't waffle or pad with unnecessary text
+- For follow-up questions, continue the conversation naturally — you remember what was just discussed
+- If someone asks "what else?" or "and then?" just carry on like a normal conversation
+- Don't use bullet points and headers for every answer — sometimes a natural paragraph is better
+- Match the energy — if someone asks a quick question, give a focused answer; if they want detail, go deep
 
-  witness: `You are PJ Witness AI, specialist in witness testimony in the Madeleine McCann case.
-Specialise in: statements, sighting reports, key claims, contradictions within and between accounts.
-When asked about a person, check whether they appear in ANY witness statement — not just as the primary subject but as someone mentioned by another witness.
-Maintain a natural conversational tone. Answer follow-up questions with full awareness of prior exchanges — "what else did she say" or "any contradictions" should be answered in context.
-Accurately represent statements. Identify witnesses by name. Highlight contradictions. Keep to 1-3 paragraphs.`,
-
-  forensics: `You are PJ Forensics AI, specialist in physical and scientific evidence in the Madeleine McCann case.
-Specialise in: DNA, cadaver/blood dogs (Eddie/Keela), luminol, lab reports, chain of custody, forensic limitations.
-Maintain a natural conversational tone across follow-up questions.
-Be precise about what was found, where, and what labs concluded. Note all limitations. Do not overstate. Keep to 1-3 paragraphs.`,
-
-  phone: `You are PJ Phone Records AI, specialist in telecommunications evidence in the Madeleine McCann case.
-Specialise in: call records, SMS, cell tower data, communications timelines, contact analysis.
-Maintain a natural conversational tone across follow-up questions.
-Be precise about times, durations, parties. Cross-reference with timeline. Highlight contradictions. Keep to 1-3 paragraphs.`,
-
-  maps: `You are PJ Maps AI, specialist in locations and spatial analysis in the Madeleine McCann case.
-Specialise in: Praia da Luz locations, Ocean Club layout, Apartment 5A, distances, routes, geographic context for sightings.
-Maintain a natural conversational tone across follow-up questions.
-Be precise about distances and spatial relationships. Relate to events and witness accounts. Keep to 1-3 paragraphs.`,
-
-  photographs: `You are PJ Photograph AI, specialist in photographic and visual evidence in the Madeleine McCann case.
-Specialise in: holiday photographs, CCTV records, visual evidence analysis, metadata, evidentiary significance.
-Maintain a natural conversational tone across follow-up questions.
-Be precise about what images show and do not show. Do not speculate beyond documentation. Keep to 1-3 paragraphs.`,
-
-  transcripts: `You are PJ Transcript AI, specialist in interview transcripts in the Madeleine McCann case.
-Specialise in: transcripts, police interview content, key statements, admissions, denials, contradictions across sessions.
-Maintain a natural conversational tone across follow-up questions. If the user says "what did she say next" or "any contradictions", answer in context.
-Quote or paraphrase accurately. Identify subject and date. Highlight contradictions. Keep to 1-3 paragraphs.`,
-
-  correspondence: `You are PJ Correspondence AI, specialist in written communications in the Madeleine McCann case.
-Specialise in: police/prosecutor/legal letters, inter-agency communications, official decisions made in writing.
-Maintain a natural conversational tone across follow-up questions.
-Be precise about sender, recipient, date. Accurately represent content. Highlight significant claims. Keep to 1-3 paragraphs.`,
-
-  police: `You are PJ Police Records AI, specialist in official investigative actions in the Madeleine McCann case.
-Specialise in: initial response, search operations, arguido status, PJ/GNR/Met/Operation Grange, official reports, documented failures.
-Maintain a natural conversational tone across follow-up questions.
-Be precise about dates, agencies, actions. Distinguish between bodies. Represent criticisms fairly. Keep to 1-3 paragraphs.`,
-
-  theories: `You are PJ Theories AI, specialist in evaluating hypotheses in the Madeleine McCann case.
-Specialise in: comparing theories against evidence, separating fact from inference/speculation, evidentiary weight, logical gaps.
-Maintain a natural conversational tone across follow-up questions.
-Always label fact vs theory. Present all significant theories fairly. Identify supporting/contradicting evidence. Never endorse beyond the evidence. Keep to 1-3 paragraphs.`,
-
-  rogatory: `You are PJ Rogatory AI, specialist in rogatory interview material in the Madeleine McCann case.
-Specialise in: UK rogatory interviews (2007-2008+), Tapas group statements, contradictions vs earlier Portuguese accounts, refusals to answer.
-Maintain a natural conversational tone across follow-up questions. If the user says "what else" or "and the timeline", answer in context of the prior exchange.
-Identify interviewee and date. Accurately quote/paraphrase. Highlight contradictions. Keep to 1-3 paragraphs.`,
-
-};
-
-console.log("[Routes] Prompts loaded:", Object.keys(prompts).join(", "));
+If the question has nothing to do with the Madeleine McCann case, just say: "I only cover the Madeleine McCann case — ask me anything about that."`;
 
 
 // ─────────────────────────────────────────────────────────────
 // FOLLOW-UP DETECTOR
-// Detects short conversational replies that don't need a Drive search
+// Short conversational replies that don't need a new Drive search
 // ─────────────────────────────────────────────────────────────
 
 function isConversationalFollowUp(question) {
-  const q = question.trim().toLowerCase();
-
+  const q         = question.trim().toLowerCase();
   const wordCount = q.split(/\s+/).length;
-  if (wordCount > 8) return false;
 
-  const followUpPatterns = [
-    /^so /,
-    /^and /,
-    /^but /,
+  if (wordCount > 10) return false;
+
+  const patterns = [
+    /^so(\s|$)/,
+    /^and(\s|$)/,
+    /^but(\s|$)/,
     /^what about/,
     /^what else/,
     /^tell me more/,
-    /^really\?/,
+    /^really\??\.?$/,
     /^are they/,
     /^were they/,
     /^is (she|he|it|that)/,
@@ -186,21 +127,25 @@ function isConversationalFollowUp(question) {
     /^how (so|did|does|was|were)/,
     /^why (did|was|were|is)/,
     /^(so )?(they|she|he) (are|were|is|was)/,
-    /^any (more|other|idea)/,
+    /^any (more|other)/,
     /^what happened (then|next|after)/,
-    /^(and )?what did (she|he|they)/,
-    /^(so )?friend/,
-    /^correct\??$/,
-    /^right\??$/,
-    /^interesting/,
-    /^makes sense/,
-    /^go on/,
-    /^continue/,
-    /^explain/,
-    /^elaborate/,
+    /^what did (she|he|they)/,
+    /^correct\??\.?$/,
+    /^right\??\.?$/,
+    /^interesting\.?$/,
+    /^go on\.?$/,
+    /^continue\.?$/,
+    /^ok(ay)?\??\.?$/,
+    /^wow\.?$/,
+    /^seriously\??\.?$/,
+    /^no way\.?$/,
+    /^makes sense\.?$/,
+    /^and (she|he|they)/,
+    /^then what/,
+    /^why (that|so)/,
   ];
 
-  return followUpPatterns.some(p => p.test(q));
+  return patterns.some(p => p.test(q));
 }
 
 
@@ -208,68 +153,53 @@ function isConversationalFollowUp(question) {
 // CORE PIPELINE
 // ─────────────────────────────────────────────────────────────
 
-async function queryArchiveAI(systemPrompt, question, route, history = []) {
+async function queryArchiveAI(question, history = []) {
   const q = question.trim().toLowerCase();
 
-  // 1. Instant greeting — zero cost
-  if (isGreeting(q)) {
-    console.log("[AI] Greeting — instant reply");
-    return GREETING_REPLY;
-  }
+  // Greeting
+  if (isGreeting(q)) return GREETING_REPLY;
 
-  // 2. Detect follow-up type
   const isFollowUp      = history.length > 0;
   const isShortFollowUp = isFollowUp && isConversationalFollowUp(question);
-  const key             = cacheKey(route, q);
+  const key             = cacheKey("/ai-search", q);
 
-  // 3. Cache check — only for standalone questions
+  // Cache — standalone questions only
   if (!isFollowUp) {
     const memHit = memGet(key);
-    if (memHit) {
-      console.log(`[Cache] MEM HIT: ${q.substring(0, 60)}`);
-      return memHit;
-    }
-
-    const dbHit = await dbGet(route, q);
-    if (dbHit) {
-      console.log(`[Cache] DB HIT: ${q.substring(0, 60)}`);
-      memSet(key, dbHit);
-      return dbHit;
-    }
+    if (memHit) { console.log(`[Cache] MEM HIT`); return memHit; }
+    const dbHit = await dbGet("/ai-search", q);
+    if (dbHit) { console.log(`[Cache] DB HIT`); memSet(key, dbHit); return dbHit; }
   }
 
-  console.log(`[Cache] MISS — calling AI: ${q.substring(0, 60)}`);
-
-  // 4. Drive retrieval — skip for short conversational follow-ups
+  // Drive retrieval — skip for short conversational replies
   let archiveContext = "";
 
   if (!isShortFollowUp) {
     const { context, sourceNote } = await retrieveRelevantContext(question);
-    archiveContext = context
-      ? `=== ARCHIVE SOURCES: ${sourceNote} ===\n\n${context}`
-      : "=== ARCHIVE: No matching documents found. Use external case knowledge and label it. ===";
-    console.log(`[AI] ${archiveContext.length} chars (~${Math.round(archiveContext.length / 4)} tokens) | ${sourceNote}`);
+    if (context) {
+      archiveContext = `=== ARCHIVE DOCUMENTS (${sourceNote}) ===\n\n${context}\n\n=== END OF ARCHIVE ===`;
+    } else {
+      archiveContext = "No matching archive documents found. Answer from broader case knowledge.";
+    }
+    console.log(`[AI] ${archiveContext.length} chars | ${sourceNote}`);
   } else {
-    console.log(`[AI] Short follow-up — answering from conversation history only`);
+    console.log(`[AI] Conversational follow-up — from history`);
   }
 
-  // 5. Build messages — history + current question
+  // Build messages
   const userContent = isShortFollowUp
     ? question
-    : archiveContext + "\n\nQuestion:\n" + question;
+    : `${archiveContext}\n\nQuestion: ${question}`;
 
-  const messages = [
-    ...history,
-    { role: "user", content: userContent },
-  ];
+  const messages = [...history, { role: "user", content: userContent }];
 
-  // 6. AI call
+  // Call AI
   const response = await axios.post(
     "https://token-plan-sgp.xiaomimimo.com/v1/chat/completions",
     {
       model: "mimo-v2-pro",
       messages: [
-        { role: "system", content: systemPrompt + SOURCE_RULE },
+        { role: "system", content: SYSTEM_PROMPT },
         ...messages,
       ],
     },
@@ -284,10 +214,10 @@ async function queryArchiveAI(systemPrompt, question, route, history = []) {
 
   const answer = response.data.choices[0].message.content;
 
-  // 7. Cache only standalone questions
+  // Cache standalone only
   if (!isFollowUp) {
     memSet(key, answer);
-    dbSet(route, q, answer);
+    dbSet("/ai-search", q, answer);
   }
 
   return answer;
@@ -295,41 +225,35 @@ async function queryArchiveAI(systemPrompt, question, route, history = []) {
 
 
 // ─────────────────────────────────────────────────────────────
-// ROUTE FACTORY
+// AI SEARCH ROUTE
 // ─────────────────────────────────────────────────────────────
 
-function createRoute(path, promptKey) {
-  app.post(path, async (req, res) => {
-    const question = (req.body.question || "").trim();
-    const history  = req.body.history  || [];
-    if (!question) return res.json({ answer: "Please enter a question." });
-    try {
-      const answer = await queryArchiveAI(prompts[promptKey], question, path, history);
-      res.json({ answer });
-    } catch (err) {
-      console.error(`[${promptKey}]`, err.response?.data || err.message);
-      res.json({ answer: "Service error — please try again." });
-    }
-  });
-}
+app.post("/ai-search", async (req, res) => {
+  const question = (req.body.question || "").trim();
+  const history  = req.body.history  || [];
+  if (!question) return res.json({ answer: "Please enter a question." });
+  try {
+    const answer = await queryArchiveAI(question, history);
+    res.json({ answer });
+  } catch (err) {
+    console.error("[AI Search]", err.response?.data || err.message);
+    res.json({ answer: "Service error — please try again." });
+  }
+});
 
-
-// ─────────────────────────────────────────────────────────────
-// AI ROUTES
-// ─────────────────────────────────────────────────────────────
-
-createRoute("/ai-search",             "aiSearch");
-createRoute("/timeline-search",       "timeline");
-createRoute("/witness-search",        "witness");
-createRoute("/forensics-search",      "forensics");
-createRoute("/phone-search",          "phone");
-createRoute("/maps-search",           "maps");
-createRoute("/photograph-search",     "photographs");
-createRoute("/transcript-search",     "transcripts");
-createRoute("/correspondence-search", "correspondence");
-createRoute("/police-search",         "police");
-createRoute("/theories-search",       "theories");
-createRoute("/rogatory-search",       "rogatory");
+// Keep all other routes pointing to the same AI pipeline
+// so every tab on your frontend still works
+app.post("/timeline-search",       async (req, res) => { const q = (req.body.question||"").trim(); const h = req.body.history||[]; if (!q) return res.json({answer:"Please enter a question."}); try { res.json({answer: await queryArchiveAI(q,h)}); } catch(e) { res.json({answer:"Service error."}); }});
+app.post("/witness-search",        async (req, res) => { const q = (req.body.question||"").trim(); const h = req.body.history||[]; if (!q) return res.json({answer:"Please enter a question."}); try { res.json({answer: await queryArchiveAI(q,h)}); } catch(e) { res.json({answer:"Service error."}); }});
+app.post("/forensics-search",      async (req, res) => { const q = (req.body.question||"").trim(); const h = req.body.history||[]; if (!q) return res.json({answer:"Please enter a question."}); try { res.json({answer: await queryArchiveAI(q,h)}); } catch(e) { res.json({answer:"Service error."}); }});
+app.post("/phone-search",          async (req, res) => { const q = (req.body.question||"").trim(); const h = req.body.history||[]; if (!q) return res.json({answer:"Please enter a question."}); try { res.json({answer: await queryArchiveAI(q,h)}); } catch(e) { res.json({answer:"Service error."}); }});
+app.post("/maps-search",           async (req, res) => { const q = (req.body.question||"").trim(); const h = req.body.history||[]; if (!q) return res.json({answer:"Please enter a question."}); try { res.json({answer: await queryArchiveAI(q,h)}); } catch(e) { res.json({answer:"Service error."}); }});
+app.post("/photograph-search",     async (req, res) => { const q = (req.body.question||"").trim(); const h = req.body.history||[]; if (!q) return res.json({answer:"Please enter a question."}); try { res.json({answer: await queryArchiveAI(q,h)}); } catch(e) { res.json({answer:"Service error."}); }});
+app.post("/transcript-search",     async (req, res) => { const q = (req.body.question||"").trim(); const h = req.body.history||[]; if (!q) return res.json({answer:"Please enter a question."}); try { res.json({answer: await queryArchiveAI(q,h)}); } catch(e) { res.json({answer:"Service error."}); }});
+app.post("/correspondence-search", async (req, res) => { const q = (req.body.question||"").trim(); const h = req.body.history||[]; if (!q) return res.json({answer:"Please enter a question."}); try { res.json({answer: await queryArchiveAI(q,h)}); } catch(e) { res.json({answer:"Service error."}); }});
+app.post("/police-search",         async (req, res) => { const q = (req.body.question||"").trim(); const h = req.body.history||[]; if (!q) return res.json({answer:"Please enter a question."}); try { res.json({answer: await queryArchiveAI(q,h)}); } catch(e) { res.json({answer:"Service error."}); }});
+app.post("/theories-search",       async (req, res) => { const q = (req.body.question||"").trim(); const h = req.body.history||[]; if (!q) return res.json({answer:"Please enter a question."}); try { res.json({answer: await queryArchiveAI(q,h)}); } catch(e) { res.json({answer:"Service error."}); }});
+app.post("/rogatory-search",       async (req, res) => { const q = (req.body.question||"").trim(); const h = req.body.history||[]; if (!q) return res.json({answer:"Please enter a question."}); try { res.json({answer: await queryArchiveAI(q,h)}); } catch(e) { res.json({answer:"Service error."}); }});
 
 
 // ─────────────────────────────────────────────────────────────
@@ -470,11 +394,10 @@ app.get("/test-drive", async (req, res) => {
 app.post("/debug-retrieval", async (req, res) => {
   const question = (req.body.question || "").trim();
   try {
-    const category = detectCategory(question);
-    const person   = extractPersonName(question);
     const { context, sourceNote } = await retrieveRelevantContext(question);
     res.json({
-      question, category, person, sourceNote,
+      question,
+      sourceNote,
       contextChars:    context.length,
       estimatedTokens: Math.round(context.length / 4),
       contextPreview:  context.substring(0, 500),
